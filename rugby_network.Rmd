@@ -1,0 +1,112 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+````{R}
+library(tidyverse)
+library(here)
+library(readxl)
+library(visNetwork)
+library(igraph)
+library(gganimate)
+```
+
+```{R}
+df_sj <- read_excel("G:/My Drive/Project Working Documents/Sports Analytics/NRL/Player Networks/Warriors_player_networks_16092023.xlsx",sheet = "data")
+
+df_no_sj <- read_excel("G:/My Drive/Project Working Documents/Sports Analytics/NRL/Player Networks/Warriors_player_networks_09092023.xlsx",sheet = "data")
+
+df_clean <- df_sj %>%
+  filter(row_number()>3) %>%
+  filter(!is.na(source_person)) %>%
+  filter(!is.na(target_person)) %>%
+  mutate(source_person = str_replace_all(source_person,"Dylan Wallker","Dylan Walker")) %>%
+  mutate(target_person = str_replace_all(target_person,"Dylan Wallker","Dylan Walker")) %>%
+  
+  mutate(source_person = str_replace_all(source_person," ","\n")) %>%
+  mutate(target_person = str_replace_all(target_person," ","\n")) %>%
+  mutate(group_id = paste0(set,"_",tackle)) 
+
+
+df_no_sj_clean <- df_no_sj %>%
+  filter(row_number()>3) %>%
+  filter(!is.na(source_person)) %>%
+  filter(!is.na(target_person)) %>%
+  mutate(source_person = str_replace_all(source_person,"Dylan Wallker","Dylan Walker")) %>%
+  mutate(target_person = str_replace_all(target_person,"Dylan Wallker","Dylan Walker")) %>%
+  
+  mutate(source_person = str_replace_all(source_person," ","\n")) %>%
+  mutate(target_person = str_replace_all(target_person," ","\n")) %>%
+  mutate(group_id = paste0(set,"_",tackle)) 
+```
+
+```{R}
+library(igraph)
+
+for(GROUP in unique(df_clean$group_id)){
+  g <- graph_from_data_frame(df_clean %>% filter(group_id == GROUP))
+  png(here("outputs","rugby",paste0(GROUP,".png")),width = 800, height = 800, res = 100)
+  plot(g)
+  dev.off()
+  }
+```
+
+```{R}
+df_overall <- df_clean %>%
+  group_by(source_person,target_person) %>%
+  summarise(value = n()) %>%
+  rename(from = "source_person",
+         to = "target_person")
+
+  g <- graph_from_data_frame(df_overall)
+
+  degreevalues<-igraph::degree(g)
+  
+nodes <- data.frame(id = V(g)$name,
+                    size = degreevalues
+                    ) %>%
+  mutate(label = str_replace_all(id," ","\n"))
+
+
+visNetwork(nodes = nodes,edges = df_overall)
+
+degreevalues
+
+df_no_sj_overall <- df_no_sj_clean %>%
+  group_by(source_person,target_person) %>%
+  summarise(value = n()) %>%
+  rename(from = "source_person",
+         to = "target_person")
+
+  g_no_sj <- graph_from_data_frame(df_no_sj_overall)
+
+  degreevalues_no_sj<-igraph::degree(g_no_sj)
+  
+nodes_no_sj <- data.frame(id = V(g_no_sj)$name,
+                    size = degreevalues_no_sj
+                    ) %>%
+  mutate(label = str_replace_all(id," ","\n"))
+
+
+visNetwork(nodes = nodes_no_sj,edges = df_no_sj_overall)
+
+degreevalues_no_sj
+```
+
+```{R}
+# Install and load the circlize package
+library(circlize)
+library(svglite)
+
+svglite(here("outputs","rugby","chord.svg"), height = 10, width = 10)
+# Create a chord diagram
+chordDiagram(df_overall, transparency = 0.5)
+dev.off()
+
+png(here("outputs","rugby","chord.png"), height = 30*275, width = 30*275, res=900)
+# Create a chord diagram
+chordDiagram(df_overall, transparency = 0.5)
+dev.off()
+```
+
